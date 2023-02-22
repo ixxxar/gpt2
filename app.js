@@ -9,6 +9,12 @@ const path = require("path");
 const TelegramBot = require("node-telegram-bot-api");
 const { json } = require("express");
 const { Agent, request } = require("undici");
+const { Configuration, OpenAIApi } = require("openai");
+
+const configuration = new Configuration({
+  apiKey: "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",
+});
+const openai = new OpenAIApi(configuration);
 
 const dispatcher = new Agent({
   connect: { rejectUnauthorized: false, timeout: 60_000 },
@@ -55,23 +61,15 @@ bot.on("message", async (msg) => {
   bot.sendMessage(chatId, "Отправляю запрос...");
   // console.log(history + " " + msg.text);
   try {
-    const res = await request("https://api.openai.com/v1/completions", {
-      dispatcher,
-      method: "POST",
-      headers: {
-        Authorization:
-          "Bearer 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",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "text-davinci-003",
-        prompt: msg.text,
-        max_tokens: 4000,
-        temperature: 0.1,
-      }),
+    const res = await openai.createCompletion({
+      model: "text-davinci-003",
+      prompt: msg.text,
+      temperature: 0.1,
+      max_tokens: 4000,
     });
-    console.log(res);
-    const { choices } = await res.body.json();
+
+    // console.log(res.body);
+    const { choices } = res.data;
     console.log(choices[0].text);
     // users.chatId = choices[0].text;
     bot.sendMessage(chatId, choices[0].text);
