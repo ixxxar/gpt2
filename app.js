@@ -12,7 +12,7 @@ const { Agent, request } = require("undici");
 const { Configuration, OpenAIApi } = require("openai");
 
 const configuration = new Configuration({
-  apiKey: "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",
+  apiKey: "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",
 });
 const openai = new OpenAIApi(configuration);
 
@@ -45,41 +45,69 @@ const users = {};
 // messages.
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
-  console.log(msg.text);
+  bot.sendChatAction(chatId, "typing");
+  console.log("Req: ", msg.text);
   if (msg.text === "/start") {
-    bot.sendMessage(chatId, "Добро Пожаловать. Я Eva, рада знакомству!");
+    bot.sendMessage(
+      chatId,
+      "Добро Пожаловать. Я Eva, рада знакомству! Задайте мне вопрос."
+    );
     return;
   }
-  // let tokens = msg.text.length + 1;
-  // let history = "";
-  // if (Object.keys(users).includes(chatId)) {
-  //   tokens += users.chatId.length;
-  //   history = users.chatId;
-  // }
+  if (msg.text.trim().toLowerCase() === "как тебя зовут?") {
+    bot.sendMessage(chatId, "Я Eva, задайте мне вопрос.");
+    return;
+  }
+  let tokens = msg.text.length + 1;
+  let history = "";
+  if (Object.keys(users).includes(chatId)) {
+    tokens += users.chatId.length;
+    history = users.chatId;
+  }
 
   // send a message to the chat acknowledging receipt of their message
-  bot.sendMessage(chatId, "Отправляю запрос...");
+
   // console.log(history + " " + msg.text);
   try {
     const res = await openai.createCompletion({
       model: "text-davinci-003",
-      prompt: msg.text,
-      temperature: 0.1,
+      prompt: "Question: " + msg.text,
+      temperature: 0,
       max_tokens: 4000,
     });
 
     // console.log(res.body);
     const { choices } = res.data;
-    console.log(choices[0].text);
+    // console.log(choices[0].text);
     // users.chatId = choices[0].text;
-    bot.sendMessage(chatId, choices[0].text);
+    bot.sendMessage(chatId, choices[0].text.split("Answer:")[1]);
   } catch (e) {
     console.log(e);
-    console.log("DATA:     ", e.data);
-    bot.sendMessage(
-      chatId,
-      "Упс, что-то пошло не так.. Пожалуйста, попробуйте позже."
-    );
+    for (let i = 1; i <= 3; i++) {
+      try {
+        const res = await openai.createCompletion({
+          model: "text-davinci-003",
+          prompt: msg.text,
+          temperature: 0,
+          max_tokens: 4000,
+        });
+
+        // console.log(res.body);
+        const { choices } = res.data;
+        // console.log(choices[0].text);
+        // users.chatId = choices[0].text;
+        bot.sendMessage(chatId, choices[0].text);
+        break;
+      } catch (e) {
+        if (i === 3) {
+          bot.sendMessage(
+            chatId,
+            "Произошла ошибка. Пожалуйста, попробуйте позже"
+          );
+          break;
+        }
+      }
+    }
   }
 });
 
