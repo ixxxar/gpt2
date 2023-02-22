@@ -16,9 +16,9 @@ const configuration = new Configuration({
 });
 const openai = new OpenAIApi(configuration);
 
-const dispatcher = new Agent({
-  connect: { rejectUnauthorized: false, timeout: 60_000 },
-});
+// const dispatcher = new Agent({
+//   connect: { rejectUnauthorized: false, timeout: 60_000 },
+// });
 
 const app = express();
 const http = require("http").createServer(app);
