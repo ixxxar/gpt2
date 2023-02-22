@@ -75,6 +75,7 @@ bot.on("message", async (msg) => {
     bot.sendMessage(chatId, choices[0].text);
   } catch (e) {
     console.log(e);
+    console.log("DATA:     ", e.data);
     bot.sendMessage(
       chatId,
       "Упс, что-то пошло не так.. Пожалуйста, попробуйте позже."
