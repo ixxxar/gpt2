@@ -12,7 +12,7 @@ const { Agent, request } = require("undici");
 const { Configuration, OpenAIApi } = require("openai");
 
 const configuration = new Configuration({
-  apiKey: "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",
+  apiKey: "",
 });
 const openai = new OpenAIApi(configuration);
 
@@ -73,7 +73,7 @@ bot.on("message", async (msg) => {
       model: "text-davinci-003",
       prompt: "Question: " + msg.text,
       temperature: 0,
-      max_tokens: 4000,
+      max_tokens: 4096 - msg.text.length - 11,
     });
 
     // console.log(res.body);
@@ -89,7 +89,7 @@ bot.on("message", async (msg) => {
           model: "text-davinci-003",
           prompt: msg.text,
           temperature: 0,
-          max_tokens: 4000,
+          max_tokens: 4096 - msg.text.length,
         });
 
         // console.log(res.body);
