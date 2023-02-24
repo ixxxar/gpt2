@@ -12,7 +12,7 @@ const { Agent, request } = require("undici");
 const { Configuration, OpenAIApi } = require("openai");
 
 const configuration = new Configuration({
-  apiKey: "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",
+  apiKey: "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",
 });
 const openai = new OpenAIApi(configuration);
 
