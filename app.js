@@ -12,11 +12,11 @@ const { Agent, request } = require("undici");
 const { Configuration, OpenAIApi } = require("openai");
 
 const configuration = new Configuration({
-<<<<<<< HEAD
-  apiKey: "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",
-=======
-  apiKey: "",
->>>>>>> dc991917d0abd9c5d5e33c1cb51fcc250cac6ac1
+
+
+
+  apiKey: "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",
+
 });
 const openai = new OpenAIApi(configuration);
 
@@ -82,9 +82,9 @@ bot.on("message", async (msg) => {
 
     // console.log(res.body);
     const { choices } = res.data;
-    // console.log(choices[0].text);
+     console.log(choices[0].text.split("Answer:"));
     // users.chatId = choices[0].text;
-    bot.sendMessage(chatId, choices[0].text.split("Answer:")[1]);
+    bot.sendMessage(chatId, choices[0].text.includes('Answer:') ? choices[0].text.split("Answer:")[1] : choices[0].text);
   } catch (e) {
     console.log(e);
     for (let i = 1; i <= 3; i++) {
