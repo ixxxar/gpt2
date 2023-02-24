@@ -45,7 +45,10 @@ const users = {};
 // messages.
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
-  bot.sendChatAction(chatId, "typing");
+  const interval = setInterval(() => {
+    bot.sendChatAction(chatId, "typing");
+  }, 5000);
+
   console.log("Req: ", msg.text);
   if (msg.text === "/start") {
     bot.sendMessage(
@@ -78,9 +81,15 @@ bot.on("message", async (msg) => {
 
     // console.log(res.body);
     const { choices } = res.data;
+    clearInterval(interval);
     // console.log(choices[0].text);
     // users.chatId = choices[0].text;
-    bot.sendMessage(chatId, choices[0].text.split("Answer:")[1]);
+    bot.sendMessage(
+      chatId,
+      choices[0].text.includes("Answer:")
+        ? choices[0].text.split("Answer:")[1]
+        : choices[0].text
+    );
   } catch (e) {
     console.log(e);
     for (let i = 1; i <= 3; i++) {
@@ -94,12 +103,14 @@ bot.on("message", async (msg) => {
 
         // console.log(res.body);
         const { choices } = res.data;
+        clearInterval(interval);
         // console.log(choices[0].text);
         // users.chatId = choices[0].text;
         bot.sendMessage(chatId, choices[0].text);
         break;
       } catch (e) {
         if (i === 3) {
+          clearInterval(interval);
           bot.sendMessage(
             chatId,
             "Произошла ошибка. Пожалуйста, попробуйте позже"
