@@ -12,10 +12,12 @@ const { Agent, request } = require("undici");
 const { Configuration, OpenAIApi } = require("openai");
 const fs = require("fs");
 const configuration = new Configuration({
-  apiKey: "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",
+  apiKey: 
 });
 const openai = new OpenAIApi(configuration);
-
+const User = require("./models/User");
+const Message = require("./models/Message");
+const Bot = require("./models/Bot");
 // const dispatcher = new Agent({
 //   connect: { rejectUnauthorized: false, timeout: 60_000 },
 // });
@@ -84,8 +86,49 @@ function levenshtein(s1, s2, costs) {
 // Listen for any kind of message. There are different kinds of
 // messages.
 bot.on("message", async (msg) => {
+	if(msg?.text?.includes('DAN')) return; 
+	const timeStart = Date.now();
+	const res1 = await Bot.find();
+  const { start_message, prompt_gpt_setting } = res1[0];
 	if(!msg.text) return false
   const chatId = msg.chat.id;
+	console.log(msg.from.id)
+	 let userBd = await User.findOne({ chat_id: msg.from.id });
+
+  if (!userBd) {
+    userBd = await User.create({
+      username: msg.from.username,
+      chat_id: msg.from.id,
+      is_paid: false,
+    });
+  }
+
+	try {
+    const { status: memberStatus } = await bot.getChatMember(
+      -1001814881068,
+      msg.from.id
+    );
+    if (
+      memberStatus === "creator" ||
+      memberStatus === "member" ||
+      memberStatus === "administrator" || userBd.createdAt.getTime() + 24 * 60 * 60 * 1000 >= Date.now()
+    ) {
+      console.log("pass validation");
+    } else {
+      bot.sendMessage(
+        chatId,
+        "Секундочку, подпишитесь пожалуйста на мой официальный канал, это обязательно условие получения тестового периода, там мои создатели делятся лафхаками по работе со мной \nКнопка «Подписаться» \n<b>!Важно!</b> Ссылка: https://t.me/+utdEB0NkMAZlZTIy",
+        { parse_mode: "HTML" }
+      );
+	    return
+    }
+  } catch (error) {
+    console.log(error);
+  
+  }      
+
+ 
+  
 	bot.sendChatAction(chatId, "typing");
   const interval = setInterval(() => {
     bot.sendChatAction(chatId, "typing");
@@ -93,23 +136,16 @@ bot.on("message", async (msg) => {
 
   console.log("Req: ", msg.text);
   if (msg.text === "/start") {
-    bot.sendMessage(
-chatId, "Привет, я рада нашему знакомству! Вы можете задать мне вопрос или попросить написать текст по какой-то теме, или код под вашу задачу. Кстати, умею создавать изображения. Например, напишите мне: " + "<i>Сгенерируй фото веселого плюшевого медведя в шапке на красной площади</i>", {parse_mode: 'HTML'}
-    );
-    clearInterval(interval);
+    bot.sendMessage(chatId, start_message, { parse_mode: "HTML" })
+	  clearInterval(interval)
 	  return;
   }
-  if (msg?.text?.trim()?.toLowerCase() === "как тебя зовут?") {
-    bot.sendMessage(chatId, "Я Eva, задайте мне вопрос.");
-  clearInterval(interval);    
-return;
-  }
   const toComp = msg?.text?.trim()?.toLowerCase()?.split(" ")?.slice(0, 2);
-  if (
+  if ( !toComp.includes('перефразируй') && (
     levenshtein(toComp?.join(" "), "сгенерируй картинку") <= 9 ||
     levenshtein(toComp?.join(" "), "сгенерируй фото") <= 9 ||
 	  levenshtein(toComp?.join(" "), "сгенерируй изображение") <= 9
-  ) {
+  )) {
     if(msg.text.trim().split(" ").slice(2).length === 0) {
       bot.sendMessage(chatId, 'Опишите изображение, которое я должна сгенерировать.')
       clearInterval(interval)
@@ -123,7 +159,7 @@ return;
       });
       const image_url = response.data.data[0].url;
       bot.sendPhoto(chatId, image_url);
-	    clearInterval(interval);
+	 interval ?   clearInterval(interval) : null
 	    return;
     } catch (e) {
       console.log(e);
@@ -133,42 +169,110 @@ return;
       );
     }
   }
-  let tokens = msg.text.length + 1;
+  
+// send a message to the chat acknowledging receipt of their message
+
+	let tokens = msg.text.length + 1;
   let history = "";
-  if (Object.keys(users).includes(chatId)) {
-    tokens += users.chatId.length;
-    history = users.chatId;
+  if (users[chatId]) {
+    tokens += users[chatId].length;
+    history = users[chatId];
   }
 
-  // send a message to the chat acknowledging receipt of their message
+  // // send a message to the chat acknowledging receipt of their message
 
-  // console.log(history + " " + msg.text);
-  try {
-    const res = await openai.createCompletion({
-      model: "text-davinci-003",
-      prompt: "Question: " + msg.text,
-      temperature: 0,
-      max_tokens: 3950 - msg.text.length - 11,
+  if (history.length > 0) {
+    try {
+      const res = await openai.createChatCompletion({
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: prompt_gpt_setting
+   
+          },
+          { role: "user", content: history[0] },
+          { role: "assistant", content: history[1] },
+          { role: "user", content: msg.text },
+        ]});
+
+      // console.log(res.body);
+      const { choices } = res.data;
+      // console.log(choices[0].text);
+      users[chatId] = [msg.text, choices[0].message.content];
+      console.log("send choice", users[chatId]);
+	    clearInterval(interval);
+     bot.sendMessage(
+      chatId,
+      choices[0].message.content.includes("JAILBREAK")
+        ? choices[0].message.content.split("JAILBREAK")[0]
+        : choices[0].message.content
+    );
+	    const { prompt_tokens, completion_tokens, total_tokens } = res.data.usage;
+    await Message.create({
+      prompt_tokens,
+      completion_tokens,
+      total_tokens,
+      prompt: msg.text.trim(),
+      response: choices[0].message.content,
+      user_id: userBd.id,
+      chat_id: chatId,
+	    difference: (Date.now() - timeStart) / 1000,
+	    username: msg.from.username
     });
+      fs.appendFile(
+      "./info.txt",
+      `Вопрос:${msg.text};;;Ответ:${
+    choices[0].message.content      };;;Пользователь:${msg.from.username};;;Дата:${new Date(Date.now()).toLocaleString('ru', 'Europe/Moscow')}\n`, () => console.log('written')
+    );
+
+      return;
+    } catch (e) {
+      console.log(e);
+    }
+  }
+  
+  try {
+    const res = await openai.createChatCompletion({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: prompt_gpt_setting,
+            
+        },
+        { role: "user", content: msg.text },
+      ]});
 
     // console.log(res.body);
     const { choices } = res.data;
     clearInterval(interval);
-    // console.log(choices[0].text);
-    // users.chatId = choices[0].text;
+    
+   users[chatId] = [msg.text, choices[0].message.content];
+    console.log("send choice2", users[chatId]);
     bot.sendMessage(
       chatId,
-      choices[0].text.includes("Answer:")
-        ? choices[0].text.split("Answer:")[1]
-        : choices[0].text
+      choices[0].message.content.includes("JAILBREAK")
+        ? choices[0].message.content.split("JAILBREAK")[0]
+        : choices[0].message.content
     );
+
+	  const { prompt_tokens, completion_tokens, total_tokens } = res.data.usage;
+    await Message.create({
+      prompt_tokens,
+      completion_tokens,
+      total_tokens,
+      prompt: msg.text.trim(),
+      response: choices[0].message.content,
+      user_id: userBd.id,
+      chat_id: chatId,
+	    difference: (Date.now() - timeStart) / 1000,
+	    username: msg.from.username
+    });
 fs.appendFile(
       "./info.txt",
       `Вопрос:${msg.text};;;Ответ:${
-        choices[0].text.includes("Answer:")
-          ? choices[0].text.split("Answer:")[1]
-          : choices[0].text
-      };;;Пользователь:${msg.from.username};;;Дата:${new Date(Date.now()).toLocaleString('ru', 'Europe/Moscow')}\n`, () => console.log('written')
+    choices[0].message.content      };;;Пользователь:${msg.from.username};;;Дата:${new Date(Date.now()).toLocaleString('ru', 'Europe/Moscow')}\n`, () => console.log('written')
     );
   } catch (e) {
     console.log(e);
@@ -243,8 +347,8 @@ if (process.env.NODE_ENV === "production") {
 
 async function start() {
   try {
-    // await mongoose.connect(config.get("mongoUri"));
-    // console.log(chalk.green(`MongoDB connected`));
+    await mongoose.connect(config.get("mongoUri"));
+     console.log(chalk.green(`MongoDB connected`));
     http.listen(PORT, () => {
       console.log(chalk.green(`Server has been started on port ${PORT}...`));
     });
